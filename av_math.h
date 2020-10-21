@@ -25,46 +25,11 @@
 /* You can some functionality by defining the appropriate macros */
 
 /* common definitions */
-#ifndef AV_INT8
-    #define AV_INT8 signed char
-#endif
-#ifndef AV_INT16
-    #define AV_INT16 signed short
-#endif
-#ifndef AV_INT32
-    #define AV_INT32 signed int
-#endif
-#ifndef AV_INT64
-    #define AV_INT64 signed long long
-#endif
-#ifndef AV_UINT8
-    #define AV_UINT8 unsigned char
-#endif
-#ifndef AV_UINT16
-    #define AV_UINT16 unsigned short
-#endif
-#ifndef AV_UINT32
-    #define AV_UINT32 unsigned int
-#endif
-#ifndef AV_UINT64
-    #define AV_UINT64 unsigned long long
-#endif
-typedef AV_INT8   av_int8;
-typedef AV_INT16  av_int16;
-typedef AV_INT32  av_int32;
-typedef AV_INT64  av_int64;
-typedef AV_UINT8  av_uint8;
-typedef AV_UINT16 av_uint16;
-typedef AV_UINT32 av_uint32;
-typedef AV_UINT64 av_uint64;
-typedef float     av_float32;
-typedef double    av_float64;
-
 #ifndef AV_FLOAT_TYPE
-    #define AV_FLOAT_TYPE av_float32 
+    #define AV_FLOAT_TYPE float 
 #endif
 #ifndef AV_INT_TYPE
-    #define AV_INT_TYPE av_int32 
+    #define AV_INT_TYPE unsigned int 
 #endif
 
 /* default int and float types.
@@ -466,6 +431,26 @@ operator*(const av_mat4x4i &lhs, const av_vec4i &rhs)
 {
     return av_mat4x4i_vec4i_mul(&lhs, &rhs);
 }
+AV_CPP_API av_mat3x3f
+operator*(av_float s, const av_mat3x3f &rhs)
+{
+    return av_mat3x3f_f_mul(s, &rhs);
+}
+AV_CPP_API av_mat4x4f
+operator*(av_float s, const av_mat4x4f &rhs)
+{
+    return av_mat4x4f_f_mul(s, &rhs);
+}
+AV_CPP_API av_mat3x3i
+operator*(av_int s, const av_mat3x3f &rhs)
+{
+    return av_mat3x3i_i_mul(s, &rhs);
+}
+AV_CPP_API av_mat4x4i
+operator*(av_int s, const av_mat4x4i &rhs)
+{
+    return av_mat4x4i_i_mul(s, &rhs);
+}
 #endif
 /* Matrix transpose, determinant, inverse */
 AV_API av_mat3x3f av_mat3x3f_transpose(const av_mat3x3f *m);
@@ -488,6 +473,24 @@ AV_API av_mat3x3f av_mat3x3f_inverse(const av_mat3x3f *m);
 AV_API av_mat4x4f av_mat4x4f_inverse(const av_mat4x4f *m); 
 /* Inverse matrices for int matrices don't make much sense, i think */
 
+/* projection matrices */
+AV_API av_mat4x4f av_make_ortho_simple(av_float width, av_float height,
+    av_float near, av_float far); 
+AV_API av_mat4x4f av_make_ortho(av_float right, av_float left,
+    av_float top, av_float bottom, av_float near, av_float far);
+AV_API av_mat4x4f av_make_perspective_bounds_simple(av_float width,
+    av_float height, av_float near, av_float far);
+AV_API av_mat4x4f av_make_perspective_bounds(av_float right, av_float left,
+    av_float top, av_float bottom, av_float near, av_float far);
+AV_API av_mat4x4f av_make_perspective(av_float fov, av_float aspect,
+    av_float near, av_float far);
+
+/* Transformation matrices */
+AV_API av_mat4x4f av_make_translation_v3(const av_vec3f *translate);
+AV_API av_mat4x4f av_make_scale_v3(const av_vec3f *scale);
+AV_API av_mat4x4f av_make_translation_3f(av_float x, av_float y, av_float z);
+AV_API av_mat4x4f av_make_scale_3f(av_float x, av_float y, av_float z);
+AV_API av_mat4x4f av_make_scale_f(av_float scale);
 #endif /* _AVORIS_MATH_H */
 
 
@@ -507,6 +510,8 @@ AV_API av_mat4x4f av_mat4x4f_inverse(const av_mat4x4f *m);
  */
 #include <math.h>
 #define AV_SQRTF sqrt 
+/* Tangens, Same as above */
+#define AV_TANF tan
 #endif
 
 #ifndef AV_ASSERT
@@ -1910,4 +1915,139 @@ av_mat4x4f_inverse(const av_mat4x4f *m)
 #undef FILL_CELL
     return inv;
 } 
+/* projection */
+AV_API av_mat4x4f
+av_make_ortho_simple(av_float width, av_float height, av_float near, av_float far)
+{
+    av_float left, right, top, bottom;
+    av_mat4x4f ortho;
+    left  = -width / 2.f;
+    right =  width / 2.f;
+    bottom = -height / 2.f;
+    top    =  height / 2.f;
+    ortho = av_make_mat4x4f_identity();
+    ortho.v00 = 2.f / width;
+    ortho.v11 = 2.f / height;
+    ortho.v22 = -2.f / (far - near);
+    ortho.v32 = -1.f * (far + near) / (far - near);
+    return ortho;
+}
+AV_API av_mat4x4f
+av_make_ortho(av_float right, av_float left, av_float top, av_float bottom,
+        av_float near, av_float far)
+{
+    av_mat4x4f ortho;
+    ortho = av_make_mat4x4f_identity();
+    ortho.v00 = 2.f / (right - left);
+    ortho.v11 = 2.f / (top - bottom);
+    ortho.v22 = -2.f / (far - near);
+    ortho.v30 = -1.f * (right + left) / (right - left);
+    ortho.v32 = -1.f * (top + bottom) / (top - bottom);
+    ortho.v32 = -1.f * (far + near) / (far - near);
+    return ortho;
+}
+AV_API av_mat4x4f
+av_make_perspective_bounds_simple(av_float width, av_float height,
+        av_float near, av_float far)
+{
+    av_mat4x4f persp;
+    av_float left, right, top, bottom;
+    left  = -width / 2.f;
+    right =  width / 2.f;
+    bottom = -height / 2.f;
+    top    =  height / 2.f;
+    persp = av_make_mat4x4f_identity();
+    persp.v00 = 2.f * near / width;
+    persp.v11 = 2.f * near / height;
+    persp.v21 = (top + bottom) / height;
+    persp.v22 = -1.f * (far + near) / (far - near);
+    persp.v32 = -1.f * (2.f * far * near) / (far - near);
+    persp.v32 = -1.f;
+    return persp;
+}
+AV_API av_mat4x4f
+av_make_perspective_bounds(av_float right, av_float left, av_float top,
+        av_float bottom, av_float near, av_float far)
+{
+    av_mat4x4f persp;
+    persp = av_make_mat4x4f_identity();
+    persp.v00 = 2.f * near / (right - left);
+    persp.v20 = (right + left) / (right - left);
+    persp.v11 = 2.f * near / (top - bottom);
+    persp.v21 = (top + bottom) / (top - bottom);
+    persp.v22 = -1.f * (far + near) / (far - near);
+    persp.v32 = -1.f * (2.f * far * near) / (far - near);
+    persp.v32 = -1.f;
+    return persp;
+}
+AV_API av_mat4x4f
+av_make_perspective(av_float fov, av_float aspect, av_float near, av_float far)
+{
+    av_mat4x4f persp;
+    av_float left, right, top, bottom;
+    top = AV_TANF(fov / 2.f) * near;
+    bottom = -1.f * top;
+    right = top * aspect;
+    left = -1.f * top * aspect;
+    persp = av_make_mat4x4f_identity();
+    persp.v00 = 2.f * near / (right - left);
+    persp.v20 = (right + left) / (right - left);
+    persp.v11 = 2.f * near / (top - bottom);
+    persp.v21 = (top + bottom) / (top - bottom);
+    persp.v22 = -1.f * (far + near) / (far - near);
+    persp.v32 = -1.f * (2.f * far * near) / (far - near);
+    persp.v32 = -1.f;
+    return persp;
+}
+/* Transformation matrices */
+AV_API av_mat4x4f
+av_make_translation_v3(const av_vec3f *translate)
+{
+    av_mat4x4f t;
+    t = av_make_mat4x4f_identity();
+    t.v03 = translate->x;
+    t.v13 = translate->y;
+    t.v23 = translate->z;
+    return t;
+}
+AV_API av_mat4x4f
+av_make_scale_v3(const av_vec3f *scale)
+{
+    av_mat4x4f t;
+    t = av_make_mat4x4f_identity();
+    t.v00 = scale->x;
+    t.v11 = scale->y;
+    t.v22 = scale->z;
+    return t;
+}
+AV_API av_mat4x4f
+av_make_translation_3f(av_float x, av_float y, av_float z)
+{
+    av_mat4x4f t;
+    t = av_make_mat4x4f_identity();
+    t.v03 = x;
+    t.v13 = y;
+    t.v23 = z;
+    return t;
+}
+AV_API av_mat4x4f
+av_make_scale_3f(av_float x, av_float y, av_float z)
+{
+    av_mat4x4f t;
+    t = av_make_mat4x4f_identity();
+    t.v00 = x;
+    t.v11 = y;
+    t.v22 = z;
+    return t;
+}
+AV_API av_mat4x4f
+av_make_scale_f(av_float scale)
+{
+    av_mat4x4f t;
+    t = av_make_mat4x4f_identity();
+    t.v11 = scale;
+    t.v22 = scale;
+    t.v33 = scale;
+    return t;
+}
 #endif /* IMPLEMENTATION */
