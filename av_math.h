@@ -96,6 +96,9 @@ typedef struct av_vec4f {
     av_float w;
 } av_vec4f;
 
+/** Equivalent to a quaternion */
+typedef av_vec4f av_quatf;
+
 /* Note that these matrices are in column-major order.
  * If you want to use these in OpenGL shaders, you can
  * pre-multiply them to vectors.
@@ -491,6 +494,31 @@ AV_API av_mat4x4f av_make_scale_v3(const av_vec3f *scale);
 AV_API av_mat4x4f av_make_translation_3f(av_float x, av_float y, av_float z);
 AV_API av_mat4x4f av_make_scale_3f(av_float x, av_float y, av_float z);
 AV_API av_mat4x4f av_make_scale_f(av_float scale);
+
+/* Rotation */
+AV_API av_quatf av_euler_2_quat(const av_vec3f *euler);
+AV_API av_vec3f av_quat_2_euler(const av_quatf *quat);
+AV_API av_mat4x4f av_quat_2_mat(const av_quatf *quat);
+AV_API av_quatf av_mat_2_quat(const av_mat4x4f *mat);
+AV_API av_mat4x4f av_euler_2_mat(const av_vec3f *euler);
+AV_API av_vec3f av_mat_2_euler(const av_mat4x4f *mat);
+AV_API av_quatf av_quatf_mul(const av_quatf *a, const av_quatf *b);
+AV_API av_vec3f av_rotate_by_quat(const av_quatf *quat, const av_vec3f *v);
+
+#ifdef __cplusplus
+/* C++ operator overloading for quaternion multiplication */
+AV_CPP_API av_quatf
+operator*(const av_quatf &a, const av_quatf &b)
+{
+    return av_quatf_mul(&a, &b);
+}
+AV_CPP_API av_vec3f
+operator*(const av_quatf &quat, const av_vec3f &v)
+{
+    return av_rotate_by_quat(&quat, &v);
+}
+#endif /* __cplusplus */
+
 #endif /* _AVORIS_MATH_H */
 
 
@@ -498,7 +526,10 @@ AV_API av_mat4x4f av_make_scale_f(av_float scale);
 #undef AV_IMPLEMENTATION
 
 /* Helper functions that can be replaced by defining the appropriate macro */
-#ifndef AV_SQRTF
+#if !defined(AV_SQRTF) || !defined(AV_TANF) || !defined(AV_COSF) || !defined(AV_ATAN2F)
+    #include <math.h>
+#endif /* math inclusion */
+
 /* Square root.
  * Uses the C89 sqrt function, which 
  * result in floats getting promoted to double.
@@ -508,17 +539,40 @@ AV_API av_mat4x4f av_make_scale_f(av_float scale);
  * sqrtf function, which may be a wrapper around the machines
  * sqrtf assembly instruction.
  */
-#include <math.h>
-#define AV_SQRTF sqrt 
+#ifndef AV_SQRTF
+#define AV_SQRTF sqrt
+#endif /* AV_SQRTF */
+
 /* Tangens, Same as above */
+#ifndef AV_TANF
 #define AV_TANF tan
-#endif
+#endif /* AV_TANF */
+
+/* Cosinus */
+#ifndef AV_COSF
+#define AV_COSF cos
+#endif /* AV_COSF */
+
+/* Sinus */
+#ifndef AV_SINF
+#define AV_SINF sin
+#endif /* AV_SINF */
+
+/* Atan2 */
+#ifndef AV_ATAN2F
+#define AV_ATAN2F atan2
+#endif /* AV_ATAN2F */
+
+/* Arcsin */
+#ifndef AV_ASINF
+#define AV_ASINF asin
+#endif /* AV_ASINF */
 
 #ifndef AV_ASSERT
 /* TODO(Kevin): We can be better than this! */
 #include <assert.h>
 #define AV_ASSERT assert 
-#endif
+#endif /* AV_ASSERT */
 
 /* Vector creation and conversion */
 AV_API av_vec2f
@@ -2049,5 +2103,78 @@ av_make_scale_f(av_float scale)
     t.v22 = scale;
     t.v33 = scale;
     return t;
+}
+/* Rotation */
+AV_API av_quatf
+av_euler_2_quat(const av_vec3f *euler)
+{
+    av_quatf quat;
+    av_float cy, sy, cp, sp, cr, sr;
+    cy = AV_COSF(euler->z * 0.5f);
+    sy = AV_SINF(euler->z * 0.5f);
+    cp = AV_COSF(euler->y * 0.5f);
+    sp = AV_SINF(euler->y * 0.5f);
+    cr = AV_COSF(euler->x * 0.5f);
+    sr = AV_SINF(euler->x * 0.5f);
+    quat.w = cr * cp * cy + sr * sp * sy;
+    quat.x = sr * cp * cy - cr * sp * sy;
+    quat.y = cr * sp * cy + sr * cp * sy;
+    quat.z = cr * cp * sy - sr * sp * cy;
+    return quat;
+}
+AV_API av_vec3f
+av_quat_2_euler(const av_quatf *quat)
+{
+    av_vec3f euler;
+    euler.x = AV_ATAN2F(2.f * quat->w * quat->x + quat->y * quat->z,
+            1.f - 2.f * (quat->x * quat->x + quat->y * quat->y));
+    euler.y = AV_ASINF(2.f * (quat->w * quat->y - quat->z * quat->x));
+    euler.z = AV_ATAN2F(2.f * (quat->w * quat->z + quat->x * quat->y),
+            1.f - 2.f * (quat->y * quat->y + quat->z * quat->z));
+    return euler;
+}
+AV_API av_mat4x4f
+av_quat_2_mat(const av_quatf *quat)
+{
+    av_mat4x4f mat;
+    return mat;
+}
+AV_API av_quatf
+av_mat_2_quat(const av_mat4x4f *mat)
+{
+    av_quatf quat;
+    return quat;
+}
+AV_API av_mat4x4f
+av_euler_2_mat(const av_vec3f *euler)
+{
+    av_mat4x4f mat;
+    return mat;
+}
+AV_API av_vec3f
+av_mat_2_euler(const av_mat4x4f *mat)
+{
+    av_vec3f euler;
+    return euler;
+}
+AV_API av_quatf
+av_quatf_mul(const av_quatf *a, const av_quatf *b)
+{
+    av_quatf prod;
+    av_vec3f cross;
+    cross = av_vec3f_cross((const av_vec3f *)a, (const av_vec3f *)b);
+    prod.w = a->w * b->w - (a->x * b->x + a->y * b->y + a->z * b->z);
+    prod.x = a->w * b->x + b->w * a->x + cross.x;
+    prod.y = a->w * b->y + b->w * a->y + cross.y;
+    prod.z = a->w * b->z + b->w * a->z + cross.z;
+    return prod;
+}
+AV_API av_vec3f
+av_rotate_by_quat(const av_quatf *quat, const av_vec3f *v)
+{
+    av_vec3f rotated, t;
+    t = av_vec3f_cross((const av_vec3f *)quat, v);
+    t = av_vec3f_mul(&t, 2.f);
+    rotated = av_vec3f_cross((const av_vec3f *)quat, &t);
 }
 #endif /* IMPLEMENTATION */
